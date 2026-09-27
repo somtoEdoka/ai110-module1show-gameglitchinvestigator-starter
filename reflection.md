@@ -57,11 +57,21 @@ Yes — I asked the AI to generate `tests/test_game_logic.py` targeting the spec
 
 - How would you explain Streamlit "reruns" and session state to a friend who has never used Streamlit?
 
+Streamlit doesn't update just the one widget you touched the way a normal web page does — every time you click a button, type in a box, or change a dropdown, it throws the whole page away and runs `app.py` again from line 1. So a plain variable is useless for anything you want to keep: `secret = random.randint(1, 100)` doesn't mean "pick a number for this game," it means "pick a new number every single click," which is exactly why the starter game was unwinnable. `st.session_state` is the one dictionary that survives those reruns, so anything the game needs to remember has to live there instead of in a local variable. The pattern that fixed it is to guard the initialization — `if "secret" not in st.session_state: st.session_state.secret = random.randint(low, high)` — which means "only do this on the very first run," and then read and write `st.session_state.secret` everywhere after. Once I understood that, bugs 1, 4, 6, and 7 were all really the same bug wearing different hats: state that either wasn't being kept when it should be, or wasn't being cleared when it should be.
+
 ---
 
 ## 5. Looking ahead: your developer habits
 
 - What is one habit or strategy from this project that you want to reuse in future labs or projects?
   - This could be a testing habit, a prompting strategy, or a way you used Git.
+
+Writing down the bug reproduction log *before* asking the AI for a fix. Having "here is the exact input, here is what I expected, here is what actually happened" ready meant my prompts described a reproducible failure instead of a vague "it's broken," and it gave me a concrete thing to re-run afterward to confirm the fix was real. The habit I want to keep with it is the second half: every bug I fixed got a pytest case that would fail if the bug came back, so `test_typos_do_not_end_the_game_early` is now a permanent record of the attempt-count bug rather than something I just remember fixing. I also want to keep pushing logic out of the UI layer — once `check_guess()` and `next_attempt_count()` were pure functions in `logic_utils.py` with no Streamlit import, they became trivially testable, and the bugs that had been hiding in them got obvious.
+
 - What is one thing you would do differently next time you work with AI on a coding task?
+
+I'd fix one bug per commit instead of letting several fixes pile up in one pass. I asked the AI to fix the attempt-count, hint, and reset bugs in a stretch and ended up with a single large commit, which made it harder to tell which change was responsible for which behavior when I went back to verify. I'd also ask "why does this code exist?" earlier rather than only when something looks wrong — the `try/except TypeError` fallback in `check_guess()` sat there looking like defensive programming for a while before I actually tested it and found it silently returns wrong hints.
+
 - In one or two sentences, describe how this project changed the way you think about AI generated code.
+
+AI-generated code can look completely reasonable and still be wrong in ways that only show up when you run it — none of these eight bugs were syntax errors or anything a linter would catch, they were plausible-looking lines like `attempts += 1` sitting two lines too early. I now treat AI output the way I'd treat a pull request from someone I don't know yet: useful, often right, but not something I merge until I've run it and written a test that proves it does what it claims.
